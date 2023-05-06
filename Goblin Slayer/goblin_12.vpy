@@ -70,7 +70,7 @@ if __name__ == '__main__':
         vof.VT(video, 'Encode by Zander', lang='it'), 
         vof.AT(audio, 'Japanese 2.0 FLAC'), 
         vof.AT(en_audio, 'English 5.1 FLAC', lang='en', default=False), 
-        vof.Chapters(ITBD).set_names(['Prologue', 'Opening', 'Part A', 'Part B', 'Epilogue', 'Preview'])
+        vof.Chapters(ITBD).set_names(['Prologue', 'Opening', 'Part A', 'Part B', 'Credits', 'Epilogue'])
     ).run()
 else:
     vof.out(src, "ITBD")
