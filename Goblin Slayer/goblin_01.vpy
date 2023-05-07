@@ -6,7 +6,7 @@ from vsdeband import Placebo
 from vsmasktools import SobelStd
 from vsrgtools import contrasharpening
 from vsdenoise import BM3DCudaRTC, Prefilter, Profile, nl_means
-from vstools import core, vs, get_y, join, depth, finalize_clip
+from vstools import core, vs, initialize_clip, finalize_clip
 
 core.set_affinity(range(16, 32), 22000)
 
@@ -27,28 +27,26 @@ setup = vof.Setup('01')
 ITBD = vof.SRC_FILE(f'{setup.vol1_dir}/00007.m2ts')
 USBD = vof.SRC_FILE(f'{setup.vol1_us_dir}/00014.m2ts', 12, -12)
 
-src = depth(ITBD.src_cut, 16)
+src = initialize_clip(ITBD.src_cut, 16)
 
 # Fix edges
 edgefix = bbmod(src, 1, 1, 1, 1, 30)
-luma = get_y(edgefix)
 
 # Rescale
-lmask = SobelStd.edgemask(luma, multi=2).std.Maximum()
+lmask = SobelStd.edgemask(edgefix, multi=2, planes=(0, True)).std.Maximum()
 rescale = vof.DescaleTarget(
     height=720, kernel=vsk.Bilinear,
     upscaler=vof.Clamped_Doubler(False, vof.Waifu2x_Doubler(tiles=2), 85),
     downscaler=vsk.Catrom,
     line_mask=lmask, credit_mask_thr=0.035
-    ).generate_clips(luma)
+    ).generate_clips(edgefix)
 
 rescaled = rescale.get_upscaled(edgefix)
 
 # Denoise
 ref = mvtools(rescaled, 70, Prefilter.MINBLUR3)
-bm3d = BM3DCudaRTC.denoise(get_y(rescaled), ref=get_y(ref), profile=Profile.NORMAL, sigma=0.5, radius=3)
-nlm = nl_means(rescaled, rclip=ref, strength=0.25, tr=2, planes=[1, 2])
-den = join(bm3d, nlm)
+bm3d = BM3DCudaRTC.denoise(rescaled, ref=ref, sigma=0.5, tr=3, profile=Profile.NORMAL, planes=0)
+den = nl_means(bm3d, ref=ref, strength=0.25, tr=2, planes=[1, 2])
 
 # Deband
 mask_deband = retinex_edgemask(den, brz=8500).rgvs.RemoveGrain(3)

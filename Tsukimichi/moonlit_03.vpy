@@ -8,7 +8,7 @@ from vsdeband import Placebo
 from vsmasktools import KirschTCanny
 from vsscale import Waifu2x, descale_detail_mask
 from vsdenoise import BM3DCudaRTC, Prefilter, Profile, nl_means
-from vstools import core, vs, depth, join, get_y, iterate, finalize_clip
+from vstools import core, vs, depth, join, get_y, iterate, initialize_clip, finalize_clip
 
 # Set threads, affinities, and cache size
 core.set_affinity(range(16, 32), 18000)
@@ -66,7 +66,7 @@ zones = [(op_start, op_end, 1.2)]
 setup = vof.Setup('03')
 JPBD = vof.SRC_FILE(f'{setup.vol1_dir}/00006.m2ts')
 
-src = depth(JPBD.src_cut, 16)
+src = initialize_clip(JPBD.src_cut, 16)
 merge = lehmer_merge_op(src, op_start, op_end, 2)
 
 # Fix dirty lines
@@ -107,9 +107,8 @@ rescaled = depth(join(masked, cshift), 16)
 
 # Denoise
 ref = mvtools(rescaled, thSAD=120)
-bm3d = BM3DCudaRTC.denoise(get_y(rescaled), ref=get_y(ref), profile=Profile.LOW_COMPLEXITY, sigma=0.7, radius=3)
-nlm = nl_means(rescaled, strength=0.65, tr=3, sr=2, wmode=3, rclip=ref, planes=[1, 2])
-denoise = join(bm3d, nlm)
+bm3d = BM3DCudaRTC.denoise(rescaled, ref=ref, sigma=0.7, tr=3, profile=Profile.LOW_COMPLEXITY, planes=0)
+denoise = nl_means(bm3d, ref=ref, strength=0.65, tr=3, wmode=3, planes=[1, 2])
 
 # AA
 mask_aa = KirschTCanny.edgemask(get_y(denoise), 60<<8, 180<<8).std.Convolution([1]*9)
